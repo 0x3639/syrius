@@ -11,13 +11,13 @@ String? extractWalletConnectUri(String rawLink, {bool isWindows = false}) {
 
   final lower = normalized.toLowerCase();
 
-  if (lower.startsWith('wc:')) {
+  if (lower.startsWith('wc:') && _isValidWalletConnectUri(normalized)) {
     return normalized;
   }
 
   if (lower.startsWith('wc%3a')) {
     final decoded = _decodeUriValue(normalized);
-    if (decoded.toLowerCase().startsWith('wc:')) {
+    if (_isValidWalletConnectUri(decoded)) {
       return decoded;
     }
   }
@@ -26,7 +26,7 @@ String? extractWalletConnectUri(String rawLink, {bool isWindows = false}) {
   final uriParam = parsed?.queryParameters['uri'];
   if (uriParam != null && uriParam.isNotEmpty) {
     final decoded = _decodeUriValue(uriParam);
-    if (decoded.toLowerCase().startsWith('wc:')) {
+    if (_isValidWalletConnectUri(decoded)) {
       return decoded;
     }
   }
@@ -37,13 +37,46 @@ String? extractWalletConnectUri(String rawLink, {bool isWindows = false}) {
     final encoded = match.group(1);
     if (encoded != null && encoded.isNotEmpty) {
       final decoded = _decodeUriValue(encoded);
-      if (decoded.toLowerCase().startsWith('wc:')) {
+      if (_isValidWalletConnectUri(decoded)) {
         return decoded;
       }
     }
   }
 
   return null;
+}
+
+bool isWalletConnectUri(String rawLink, {bool isWindows = false}) {
+  return extractWalletConnectUri(rawLink, isWindows: isWindows) != null;
+}
+
+bool _isValidWalletConnectUri(String value) {
+  final normalized = value.trim();
+  final match = RegExp(
+    r'^wc:([^@?\s]+)@(\d+)\?(.+)$',
+    caseSensitive: false,
+  ).firstMatch(normalized);
+
+  if (match == null) {
+    return false;
+  }
+
+  if (match.group(2) != '2') {
+    return false;
+  }
+
+  final query = match.group(3);
+  if (query == null || query.isEmpty) {
+    return false;
+  }
+
+  try {
+    final queryParameters = Uri.splitQueryString(query);
+    return (queryParameters['relay-protocol']?.isNotEmpty ?? false) &&
+        (queryParameters['symKey']?.isNotEmpty ?? false);
+  } catch (_) {
+    return false;
+  }
 }
 
 String _decodeUriValue(String value) {

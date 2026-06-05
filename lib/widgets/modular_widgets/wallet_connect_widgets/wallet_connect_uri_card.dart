@@ -22,6 +22,8 @@ class _WalletConnectUriCardState extends State<WalletConnectUriCard> {
 
   final _uriKey = GlobalKey<FormState>();
 
+  String? get _walletConnectUri => extractWalletConnectUri(_uriController.text);
+
   @override
   Widget build(BuildContext context) {
     return CardScaffold(
@@ -50,20 +52,17 @@ class _WalletConnectUriCardState extends State<WalletConnectUriCard> {
                   children: [
                     const CircleAvatar(
                       backgroundColor: Colors.white12,
-                      child: Icon(
-                        Icons.link,
-                        color: AppColors.znnColor,
-                      ),
+                      child: Icon(Icons.link, color: AppColors.znnColor),
                     ),
                     Form(
                       key: _uriKey,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       child: InputField(
                         validator: (value) {
-                          if (Uri.tryParse(value ?? '') != null) {
+                          if (extractWalletConnectUri(value ?? '') != null) {
                             return null;
                           } else {
-                            return 'URI invalid';
+                            return 'WalletConnect URI invalid';
                           }
                         },
                         onChanged: (value) {
@@ -73,8 +72,9 @@ class _WalletConnectUriCardState extends State<WalletConnectUriCard> {
                         suffixIcon: RawMaterialButton(
                           shape: const CircleBorder(),
                           onPressed: () {
-                            ClipboardUtils.pasteToClipboard(context,
-                                (String value) {
+                            ClipboardUtils.pasteToClipboard(context, (
+                              String value,
+                            ) {
                               _uriController.text = value;
                               setState(() {});
                             });
@@ -97,14 +97,11 @@ class _WalletConnectUriCardState extends State<WalletConnectUriCard> {
               ),
               MyOutlinedButton(
                 text: 'Connect',
-                onPressed:
-                    Uri.tryParse(_uriController.text) != null
-                        ? () {
-                            _pairWithDapp(
-                              Uri.parse(_uriController.text),
-                            );
-                          }
-                        : null,
+                onPressed: _walletConnectUri != null
+                    ? () {
+                        _pairWithDapp(Uri.parse(_walletConnectUri!));
+                      }
+                    : null,
                 minimumSize: kLoadingButtonMinSize,
               ),
             ],
@@ -118,14 +115,16 @@ class _WalletConnectUriCardState extends State<WalletConnectUriCard> {
   Future<void> _pairWithDapp(Uri uri) async {
     try {
       final pairingInfo = await sl.get<IWeb3WalletService>().pair(uri);
-      Logger('WalletConnectPairingCard')
-          .log(Level.INFO, 'pairing info', pairingInfo.toJson());
+      Logger(
+        'WalletConnectPairingCard',
+      ).log(Level.INFO, 'pairing info', pairingInfo.toJson());
       _uriController = TextEditingController();
       _uriKey.currentState?.reset();
       setState(() {});
     } catch (e, stackTrace) {
-      Logger('WalletConnectPairingCard')
-          .log(Level.INFO, 'pairing failed', e, stackTrace);
+      Logger(
+        'WalletConnectPairingCard',
+      ).log(Level.INFO, 'pairing failed', e, stackTrace);
       await NotificationUtils.sendNotificationError(e, 'Pairing failed');
     }
   }

@@ -59,36 +59,53 @@ class _WalletConnectCameraCardState extends State<WalletConnectCameraCard> {
                     await Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => AiBarcodeScanner(
-                          validator: (capture) => _filterBarcodes(capture) != null,
+                          validator: (capture) =>
+                              _filterBarcodes(capture) != null,
                           onDetect: (value) async {
-                            Logger('WalletConnectCameraCard').log(
-                              Level.INFO,
-                              'onDetect',
-                              value.toString(),
-                            );
+                            Logger(
+                              'WalletConnectCameraCard',
+                            ).log(Level.INFO, 'onDetect', value.toString());
                             final wcService = sl.get<IWeb3WalletService>();
                             final Barcode? barcode = _filterBarcodes(value);
                             if (barcode != null) {
-                              final pairingInfo = await wcService.pair(
-                                Uri.parse(value.barcodes.first.displayValue!),
+                              final walletConnectUri = extractWalletConnectUri(
+                                barcode.displayValue ?? '',
                               );
-                              Logger('WalletConnectCameraCard').log(
-                                Level.INFO,
-                                'pairing info',
-                                pairingInfo.toJson(),
-                              );
-                              setState(() {});
+                              if (walletConnectUri == null) return;
+                              try {
+                                final pairingInfo = await wcService.pair(
+                                  Uri.parse(walletConnectUri),
+                                );
+                                Logger('WalletConnectCameraCard').log(
+                                  Level.INFO,
+                                  'pairing info',
+                                  pairingInfo.toJson(),
+                                );
+                                setState(() {});
+                              } catch (e, stackTrace) {
+                                Logger('WalletConnectCameraCard').log(
+                                  Level.INFO,
+                                  'pairing failed',
+                                  e,
+                                  stackTrace,
+                                );
+                                await NotificationUtils.sendNotificationError(
+                                  e,
+                                  'Pairing failed',
+                                );
+                              }
                             }
                           },
                           onDispose: () {
-                            Logger('WalletConnectCameraCard')
-                                .log(Level.INFO, 'onDispose');
+                            Logger(
+                              'WalletConnectCameraCard',
+                            ).log(Level.INFO, 'onDispose');
                           },
                           controller: MobileScannerController(
                             facing: CameraFacing.front,
                             detectionSpeed: DetectionSpeed.noDuplicates,
                           ),
-                          errorBuilder: (p0, p1,) {
+                          errorBuilder: (p0, p1) {
                             // Pop navigator and close camera after 10 seconds
                             Timer(const Duration(seconds: 10), () {
                               Navigator.pop(context);
@@ -97,10 +114,12 @@ class _WalletConnectCameraCardState extends State<WalletConnectCameraCard> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('${p1.errorCode}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium),
+                                  Text(
+                                    '${p1.errorCode}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
                                   Container(height: 16),
                                   const Icon(
                                     MaterialCommunityIcons.camera_off,
@@ -131,22 +150,13 @@ class _WalletConnectCameraCardState extends State<WalletConnectCameraCard> {
     super.dispose();
   }
 
-  bool canParseWalletConnectUri(String wcUri) {
-    Uri? walletConnectUri;
-    walletConnectUri = Uri.tryParse(wcUri);
-    if (walletConnectUri != null) {
-      return true;
-    }
-    return false;
-  }
-
   /// A BarcodeCapture can contain multiple barcodes. This function returns
   /// the first valid WC barcode
   Barcode? _filterBarcodes(BarcodeCapture capture) {
     for (final barcode in capture.barcodes) {
       final String? uri = barcode.displayValue;
       if (uri != null) {
-        if (!canParseWalletConnectUri(uri)) {
+        if (isWalletConnectUri(uri)) {
           return barcode;
         }
       }

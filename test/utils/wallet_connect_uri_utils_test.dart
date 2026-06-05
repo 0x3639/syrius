@@ -40,6 +40,34 @@ void main() {
       expect(result, isNull);
     });
 
+    test('returns null for generic parseable uri', () {
+      const input = 'https://example.com/not-walletconnect';
+
+      final result = extractWalletConnectUri(input);
+      expect(result, isNull);
+    });
+
+    test('returns null for wc uri without required parameters', () {
+      const input = 'wc:1234abcd@2';
+
+      final result = extractWalletConnectUri(input);
+      expect(result, isNull);
+    });
+
+    test('returns null for unsupported WalletConnect version', () {
+      const input = 'wc:1234abcd@1?relay-protocol=irn&symKey=abcdef';
+
+      final result = extractWalletConnectUri(input);
+      expect(result, isNull);
+    });
+
+    test('checks whether a raw value contains a valid wc uri', () {
+      final encoded = Uri.encodeComponent(wcDirect);
+
+      expect(isWalletConnectUri('syrius://wc?uri=$encoded'), isTrue);
+      expect(isWalletConnectUri('https://example.com'), isFalse);
+    });
+
     test('returns null for empty link', () {
       final result = extractWalletConnectUri('   ');
       expect(result, isNull);

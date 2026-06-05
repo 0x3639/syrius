@@ -51,19 +51,22 @@ main() async {
   Hive.init(znnDefaultPaths.cache.path.toString());
 
   // Setup logger
-  Directory syriusLogDir =
-      Directory(path.join(znnDefaultCacheDirectory.path, 'log'));
+  Directory syriusLogDir = Directory(
+    path.join(znnDefaultCacheDirectory.path, 'log'),
+  );
   if (!syriusLogDir.existsSync()) {
     syriusLogDir.createSync(recursive: true);
   }
   final logFile = File(
-      '${syriusLogDir.path}${path.separator}syrius-${DateTime.now().millisecondsSinceEpoch}.log');
+    '${syriusLogDir.path}${path.separator}syrius-${DateTime.now().millisecondsSinceEpoch}.log',
+  );
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((LogRecord record) {
     if (kDebugMode) {
       print(
-          '${record.level.name} ${record.loggerName} ${record.message} ${record.time}: '
-          '${record.error} ${record.stackTrace}\n');
+        '${record.level.name} ${record.loggerName} ${record.message} ${record.time}: '
+        '${record.error} ${record.stackTrace}\n',
+      );
     }
     logFile.writeAsString(
       '${record.level.name} ${record.loggerName} ${record.message} ${record.time}: '
@@ -127,8 +130,9 @@ main() async {
       if (windowPositionX != null && windowPositionY != null) {
         windowPositionX = windowPositionX >= 0 ? windowPositionX : 100;
         windowPositionY = windowPositionY >= 0 ? windowPositionY : 100;
-        await windowManager
-            .setPosition(Offset(windowPositionX, windowPositionY));
+        await windowManager.setPosition(
+          Offset(windowPositionX, windowPositionY),
+        );
       }
 
       bool? windowMaximized = sharedPrefsService!.get(kWindowMaximizedKey);
@@ -138,9 +142,7 @@ main() async {
     }
   });
 
-  runApp(
-    const MyApp(),
-  );
+  runApp(const MyApp());
 }
 
 Future<void> _setupTrayManager() async {
@@ -153,34 +155,27 @@ Future<void> _setupTrayManager() async {
     await trayManager.setToolTip('s y r i u s');
   }
   List<MenuItem> items = [
-    MenuItem(
-      key: 'show_wallet',
-      label: 'Show wallet',
-    ),
-    MenuItem(
-      key: 'hide_wallet',
-      label: 'Hide wallet',
-    ),
+    MenuItem(key: 'show_wallet', label: 'Show wallet'),
+    MenuItem(key: 'hide_wallet', label: 'Hide wallet'),
     MenuItem.separator(),
-    MenuItem(
-      key: 'exit',
-      label: 'Exit wallet',
-    ),
+    MenuItem(key: 'exit', label: 'Exit wallet'),
   ];
   await trayManager.setContextMenu(Menu(items: items));
 }
 
 Future<void> _loadDefaultCommunityNodes() async {
   try {
-    var nodes = await loadJsonFromAssets('assets/community-nodes.json')
-        as List<dynamic>;
+    var nodes =
+        await loadJsonFromAssets('assets/community-nodes.json')
+            as List<dynamic>;
     kDefaultCommunityNodes = nodes
         .map((node) => node.toString())
         .where((node) => InputValidators.node(node) == null)
         .toList();
   } catch (e, stackTrace) {
-    Logger('main')
-        .log(Level.WARNING, '_loadDefaultCommunityNodes', e, stackTrace);
+    Logger(
+      'main',
+    ).log(Level.WARNING, '_loadDefaultCommunityNodes', e, stackTrace);
   }
 }
 
@@ -188,42 +183,46 @@ void setup() {
   sl.registerSingleton<Zenon>(Zenon());
   zenon = sl<Zenon>();
   sl.registerLazySingletonAsync<SharedPrefsService>(
-      (() => SharedPrefsService.getInstance().then((value) => value!)));
+    (() => SharedPrefsService.getInstance().then((value) => value!)),
+  );
   sl.registerSingleton<HtlcSwapsService>(HtlcSwapsService.getInstance());
 
   // Register WalletConnect service
   sl.registerSingleton<IWeb3WalletService>(Web3WalletService.getInstance());
 
-  sl.registerSingleton<IChain>(
-    NoMService(reference: NoMChainId.mainnet),
-    instanceName: NoMChainId.mainnet.chain(),
-  );
+  for (final chainId in NoMChainId.values) {
+    sl.registerSingleton<IChain>(
+      NoMService(reference: chainId),
+      instanceName: chainId.chain(),
+    );
+  }
 
   sl.registerSingleton<AutoReceiveTxWorker>(AutoReceiveTxWorker.getInstance());
   sl.registerSingleton<AutoUnlockHtlcWorker>(
-      AutoUnlockHtlcWorker.getInstance());
+    AutoUnlockHtlcWorker.getInstance(),
+  );
 
   sl.registerSingleton<HtlcSwapsHandler>(HtlcSwapsHandler.getInstance());
 
-  sl.registerSingleton<ReceivePort>(ReceivePort(),
-      instanceName: 'embeddedStoppedPort');
+  sl.registerSingleton<ReceivePort>(
+    ReceivePort(),
+    instanceName: 'embeddedStoppedPort',
+  );
   sl.registerSingleton<Stream>(
-      sl<ReceivePort>(instanceName: 'embeddedStoppedPort').asBroadcastStream(),
-      instanceName: 'embeddedStoppedStream');
+    sl<ReceivePort>(instanceName: 'embeddedStoppedPort').asBroadcastStream(),
+    instanceName: 'embeddedStoppedStream',
+  );
 
   sl.registerSingleton<PlasmaStatsBloc>(PlasmaStatsBloc());
   sl.registerSingleton<BalanceBloc>(BalanceBloc());
   sl.registerSingleton<TransferWidgetsBalanceBloc>(
-      TransferWidgetsBalanceBloc());
+    TransferWidgetsBalanceBloc(),
+  );
   sl.registerSingleton<NotificationsBloc>(NotificationsBloc());
   sl.registerSingleton<AcceleratorBalanceBloc>(AcceleratorBalanceBloc());
   sl.registerSingleton<PowGeneratingStatusBloc>(PowGeneratingStatusBloc());
-  sl.registerSingleton<WalletConnectPairingsBloc>(
-    WalletConnectPairingsBloc(),
-  );
-  sl.registerSingleton<WalletConnectSessionsBloc>(
-    WalletConnectSessionsBloc(),
-  );
+  sl.registerSingleton<WalletConnectPairingsBloc>(WalletConnectPairingsBloc());
+  sl.registerSingleton<WalletConnectSessionsBloc>(WalletConnectSessionsBloc());
 }
 
 class MyApp extends StatefulWidget {
@@ -246,8 +245,9 @@ class _MyAppState extends State<MyApp> with WindowListener, TrayListener {
 
   // Platform messages are asynchronous, so we initialize in an async method
   Future<void> initPlatformState() async {
-    kLocalIpAddress =
-        await NetworkUtils.getLocalIpAddress(InternetAddressType.IPv4);
+    kLocalIpAddress = await NetworkUtils.getLocalIpAddress(
+      InternetAddressType.IPv4,
+    );
 
     if (!mounted) return;
   }
@@ -272,17 +272,17 @@ class _MyAppState extends State<MyApp> with WindowListener, TrayListener {
           create: (_) => AppThemeNotifier(),
         ),
         ChangeNotifierProvider<ValueNotifier<List<String>>>(
-          create: (_) => ValueNotifier<List<String>>(
-            [],
-          ),
+          create: (_) => ValueNotifier<List<String>>([]),
         ),
         Provider<LockBloc>(
           create: (_) => LockBloc(),
           builder: (context, child) {
             return Consumer<AppThemeNotifier>(
               builder: (_, appThemeNotifier, __) {
-                LockBloc lockBloc =
-                    Provider.of<LockBloc>(context, listen: false);
+                LockBloc lockBloc = Provider.of<LockBloc>(
+                  context,
+                  listen: false,
+                );
                 return OverlaySupport(
                   child: Listener(
                     onPointerSignal: (event) {
@@ -329,8 +329,9 @@ class _MyAppState extends State<MyApp> with WindowListener, TrayListener {
                             },
                             onGenerateRoute: (settings) {
                               if (settings.name == SyriusErrorWidget.route) {
-                                final args = settings.arguments
-                                    as CustomSyriusErrorWidgetArguments;
+                                final args =
+                                    settings.arguments
+                                        as CustomSyriusErrorWidgetArguments;
                                 return MaterialPageRoute(
                                   builder: (context) =>
                                       SyriusErrorWidget(args.errorText),
@@ -355,31 +356,16 @@ class _MyAppState extends State<MyApp> with WindowListener, TrayListener {
   @override
   void onWindowClose() async {
     bool windowMaximized = await windowManager.isMaximized();
-    await sharedPrefsService!.put(
-      kWindowMaximizedKey,
-      windowMaximized,
-    );
+    await sharedPrefsService!.put(kWindowMaximizedKey, windowMaximized);
 
     if (windowMaximized != true) {
       Size windowSize = await windowManager.getSize();
-      await sharedPrefsService!.put(
-        kWindowSizeWidthKey,
-        windowSize.width,
-      );
-      await sharedPrefsService!.put(
-        kWindowSizeHeightKey,
-        windowSize.height,
-      );
+      await sharedPrefsService!.put(kWindowSizeWidthKey, windowSize.width);
+      await sharedPrefsService!.put(kWindowSizeHeightKey, windowSize.height);
 
       Offset windowPosition = await windowManager.getPosition();
-      await sharedPrefsService!.put(
-        kWindowPositionXKey,
-        windowPosition.dx,
-      );
-      await sharedPrefsService!.put(
-        kWindowPositionYKey,
-        windowPosition.dy,
-      );
+      await sharedPrefsService!.put(kWindowPositionXKey, windowPosition.dx);
+      await sharedPrefsService!.put(kWindowPositionYKey, windowPosition.dy);
     }
 
     sl<Zenon>().wsClient.stop();

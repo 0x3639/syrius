@@ -65,15 +65,18 @@ class _WalletConnectQrCardState extends State<WalletConnectQrCard> {
             child: PrettyQrView.data(
               data: 'Scan the WalletConnect QR from the dApp',
               decoration: const PrettyQrDecoration(
-                  shape: PrettyQrSmoothSymbol(
-                    roundFactor: 0,
-                    color: AppColors.znnColor,
+                shape: PrettyQrSmoothSymbol(
+                  roundFactor: 0,
+                  color: AppColors.znnColor,
+                ),
+                image: PrettyQrDecorationImage(
+                  scale: 0.3,
+                  padding: EdgeInsets.only(top: 10, bottom: 10),
+                  image: AssetImage(
+                    'assets/images/qr_code_child_image_znn.png',
                   ),
-                  image: PrettyQrDecorationImage(
-                      scale: 0.3,
-                      padding: EdgeInsets.only(top: 10, bottom: 10),
-                      image: AssetImage(
-                          'assets/images/qr_code_child_image_znn.png'))),
+                ),
+              ),
               errorCorrectLevel: QrErrorCorrectLevel.H,
             ),
           ),
@@ -83,8 +86,8 @@ class _WalletConnectQrCardState extends State<WalletConnectQrCard> {
               checkPermissionForMacOS().then((value) {
                 if (value) {
                   windowManager.minimize().then(
-                        (value) => _handleClickCapture(CaptureMode.region),
-                      );
+                    (value) => _handleClickCapture(CaptureMode.region),
+                  );
                 }
               });
             },
@@ -99,8 +102,9 @@ class _WalletConnectQrCardState extends State<WalletConnectQrCard> {
     try {
       final wcService = sl.get<IWeb3WalletService>();
       final pairingInfo = await wcService.pair(uri);
-      Logger('WalletConnectPairingCard')
-          .log(Level.INFO, 'pairing info', pairingInfo.toJson());
+      Logger(
+        'WalletConnectPairingCard',
+      ).log(Level.INFO, 'pairing info', pairingInfo.toJson());
       _uriController = TextEditingController();
       _uriKey.currentState?.reset();
       setState(() {});
@@ -112,7 +116,8 @@ class _WalletConnectQrCardState extends State<WalletConnectQrCard> {
   void _handleClickCapture(CaptureMode mode) async {
     try {
       Directory walletConnectDirectory = Directory(
-          path.join(znnDefaultPaths.cache.path, walletConnectDirName));
+        path.join(znnDefaultPaths.cache.path, walletConnectDirName),
+      );
 
       if (!walletConnectDirectory.existsSync()) {
         walletConnectDirectory.createSync(recursive: true);
@@ -122,8 +127,8 @@ class _WalletConnectQrCardState extends State<WalletConnectQrCard> {
           'screenshot-${DateTime.now().millisecondsSinceEpoch}';
 
       final imagePath = await File(
-              '${walletConnectDirectory.absolute.path}${path.separator}$screenshotName.png')
-          .create();
+        '${walletConnectDirectory.absolute.path}${path.separator}$screenshotName.png',
+      ).create();
 
       _lastCapturedData = await screenCapturer.capture(
         mode: mode,
@@ -135,34 +140,43 @@ class _WalletConnectQrCardState extends State<WalletConnectQrCard> {
         var image = img.decodePng(imagePath.readAsBytesSync())!;
 
         LuminanceSource source = RGBLuminanceSource(
-            image.width, image.height, image.getBytes().buffer.asInt32List());
+          image.width,
+          image.height,
+          image.getBytes().buffer.asInt32List(),
+        );
         var bitmap = BinaryBitmap(HybridBinarizer(source));
 
         var reader = QRCodeReader();
         var result = reader.decode(bitmap);
 
         if (result.rawBytes!.isNotEmpty) {
-          if (result.text.isNotEmpty &&
-              Uri.tryParse(result.text) != null) {
+          final walletConnectUri = extractWalletConnectUri(result.text);
+          if (walletConnectUri != null) {
             await windowManager.show();
-            _uriController.text = result.text;
+            _uriController.text = walletConnectUri;
+            await _pairWithDapp(Uri.parse(walletConnectUri));
           } else {
             await windowManager.show();
-            await sl<NotificationsBloc>().addNotification(WalletNotification(
+            await sl<NotificationsBloc>().addNotification(
+              WalletNotification(
                 title: 'Invalid QR code',
                 timestamp: DateTime.now().millisecondsSinceEpoch,
                 details: 'Please scan a valid WalletConnect QR code',
-                type: NotificationType.error));
+                type: NotificationType.error,
+              ),
+            );
           }
         } else {
           await windowManager.show();
-          await sl<NotificationsBloc>().addNotification(WalletNotification(
+          await sl<NotificationsBloc>().addNotification(
+            WalletNotification(
               title: 'QR code scan failed',
               timestamp: DateTime.now().millisecondsSinceEpoch,
               details: 'Please scan a valid WalletConnect QR code',
-              type: NotificationType.error));
+              type: NotificationType.error,
+            ),
+          );
         }
-        await _pairWithDapp(Uri.parse(result.text));
       } else {
         await windowManager.show();
         await sl<NotificationsBloc>().addErrorNotification(
@@ -172,20 +186,25 @@ class _WalletConnectQrCardState extends State<WalletConnectQrCard> {
       }
     } on Exception catch (e) {
       await windowManager.show();
-      await sl<NotificationsBloc>()
-          .addErrorNotification(e, 'Invalid QR code exception');
+      await sl<NotificationsBloc>().addErrorNotification(
+        e,
+        'Invalid QR code exception',
+      );
     }
   }
 
   Future<bool> checkPermissionForMacOS() async {
     if (Platform.isMacOS) {
       if (!await _requestAccessForMacOS()) {
-        await sl<NotificationsBloc>().addNotification(WalletNotification(
+        await sl<NotificationsBloc>().addNotification(
+          WalletNotification(
             title: 'Permission required',
             timestamp: DateTime.now().millisecondsSinceEpoch,
             details:
                 'Screen Recording permission is required to scan and process the on-screen WalletConnect QR code',
-            type: NotificationType.generatingPlasma));
+            type: NotificationType.generatingPlasma,
+          ),
+        );
         return false;
       }
       return true;
