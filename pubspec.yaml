@@ -80,6 +80,10 @@ dependency_overrides:
   # in this PR. Remove when upstream reown_core contains the same fix.
   reown_core:
     path: patched_packages/reown_core-1.3.8
+  # Temporary override to skip WalletConnect Pay plugin initialization on
+  # desktop, where walletconnect_pay has no macOS implementation.
+  reown_walletkit:
+    path: patched_packages/reown_walletkit-1.4.0
 
 dev_dependencies:
   flutter_test:

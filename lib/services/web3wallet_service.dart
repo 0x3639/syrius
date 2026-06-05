@@ -88,9 +88,6 @@ class Web3WalletService extends IWeb3WalletService {
     );
 
     _subscribeListeners();
-    _registerEventEmitters();
-    _registerRequestHandlers();
-    _startPendingRequestsPolling();
   }
 
   @override
@@ -122,9 +119,12 @@ class Web3WalletService extends IWeb3WalletService {
   Future<void> _initialize() async {
     await _wcClient!.init();
 
-    _isInitialized = true;
+    _registerEventEmitters();
+    _registerRequestHandlers();
     _registerAccountsIfNeeded();
+    _startPendingRequestsPolling();
 
+    _isInitialized = true;
     _reloadStores();
     _refreshUi();
   }
@@ -758,6 +758,10 @@ class Web3WalletService extends IWeb3WalletService {
     }
 
     final dAppMetadata = event.params.proposer.metadata;
+    final dAppName = _dAppName(dAppMetadata);
+    final dAppDescription = _dAppDescription(dAppMetadata);
+    final dAppUrl = _dAppUrl(dAppMetadata);
+    final dAppIconUrl = _dAppIconUrl(dAppMetadata);
     final unsupportedProposalReason = _unsupportedRequiredNamespaceReason(
       event.params.requiredNamespaces,
     );
@@ -802,7 +806,7 @@ class Web3WalletService extends IWeb3WalletService {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text('Are you sure you want to connect to ${dAppMetadata.name}?'),
+          Text('Are you sure you want to connect to $dAppName?'),
           kVerticalSpacing,
           Text('Chains: $requestedChains'),
           kVerticalSpacing,
@@ -810,24 +814,25 @@ class Web3WalletService extends IWeb3WalletService {
           kVerticalSpacing,
           Text('Events: $requestedEvents'),
           kVerticalSpacing,
-          if (dAppMetadata.icons.isNotEmpty)
+          if (dAppIconUrl != null)
             Image(
-              image: NetworkImage(dAppMetadata.icons.first),
+              image: NetworkImage(dAppIconUrl),
               height: 100,
               fit: BoxFit.fitHeight,
             ),
           kVerticalSpacing,
-          Text(dAppMetadata.description),
+          Text(dAppDescription),
           kVerticalSpacing,
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(dAppMetadata.url, overflow: TextOverflow.ellipsis),
-              ),
-              LinkIcon(url: dAppMetadata.url),
-            ],
-          ),
+          if (dAppUrl != null)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(dAppUrl, overflow: TextOverflow.ellipsis),
+                ),
+                LinkIcon(url: dAppUrl),
+              ],
+            ),
         ],
       ),
       onYesButtonPressed: () async {},
@@ -975,12 +980,13 @@ class Web3WalletService extends IWeb3WalletService {
   Future<void> _sendSuccessfullyApprovedSessionNotification(
     PairingMetadata dAppMetadata,
   ) {
+    final dAppName = _dAppName(dAppMetadata);
+
     return sl.get<NotificationsBloc>().addNotification(
           WalletNotification(
-            title: 'Successfully connected to ${dAppMetadata.name}',
+            title: 'Successfully connected to $dAppName',
             timestamp: DateTime.now().millisecondsSinceEpoch,
-            details:
-                'Successfully connected to ${dAppMetadata.name} via WalletConnect',
+            details: 'Successfully connected to $dAppName via WalletConnect',
             type: NotificationType.paymentSent,
           ),
         );
@@ -1012,6 +1018,42 @@ class Web3WalletService extends IWeb3WalletService {
     return kAddressLabelMap.keys
         .map((address) => '$kZenonNameSpace:$chainId:$address')
         .toList();
+  }
+
+  String _dAppName(PairingMetadata metadata) {
+    return _metadataValue(metadata.name, 'Unknown dApp');
+  }
+
+  String _dAppDescription(PairingMetadata metadata) {
+    return _metadataValue(metadata.description, 'No description provided');
+  }
+
+  String? _dAppUrl(PairingMetadata metadata) {
+    final value = _metadataValue(metadata.url, '');
+    final uri = Uri.tryParse(value);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return null;
+    }
+    return value;
+  }
+
+  String? _dAppIconUrl(PairingMetadata metadata) {
+    for (final icon in metadata.icons) {
+      final value = _metadataValue(icon, '');
+      final uri = Uri.tryParse(value);
+      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  String _metadataValue(String value, String fallback) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') {
+      return fallback;
+    }
+    return trimmed;
   }
 
   void _upsertSession(SessionData session) {

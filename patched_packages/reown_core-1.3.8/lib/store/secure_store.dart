@@ -62,6 +62,10 @@ class SecureStore implements IStore<Map<String, dynamic>> {
   Map<String, dynamic>? get(String key) {
     _checkInitialized();
 
+    if (_useFallbackStorage) {
+      return _fallbackStorage.get(key);
+    }
+
     final String keyWithPrefix = _addPrefix(key);
     if (_map.containsKey(keyWithPrefix)) {
       return _map[keyWithPrefix];
@@ -75,6 +79,11 @@ class SecureStore implements IStore<Map<String, dynamic>> {
   @override
   bool has(String key) {
     _checkInitialized();
+
+    if (_useFallbackStorage) {
+      return _fallbackStorage.has(key);
+    }
+
     final String keyWithPrefix = _addPrefix(key);
 
     // Only check memory for secure storage (can't check secure storage synchronously)
@@ -84,6 +93,11 @@ class SecureStore implements IStore<Map<String, dynamic>> {
   @override
   List<Map<String, dynamic>> getAll() {
     _checkInitialized();
+
+    if (_useFallbackStorage) {
+      return _fallbackStorage.getAll().cast<Map<String, dynamic>>();
+    }
+
     return values;
   }
 
@@ -101,10 +115,7 @@ class SecureStore implements IStore<Map<String, dynamic>> {
         final stringValue = jsonEncode(value);
         await _secureStorage.write(key: keyWithPrefix, value: stringValue);
       } catch (e) {
-        throw Errors.getInternalError(
-          Errors.MISSING_OR_INVALID,
-          context: e.toString(),
-        );
+        await _switchToFallbackStorage(e);
       }
     }
   }
@@ -125,10 +136,7 @@ class SecureStore implements IStore<Map<String, dynamic>> {
           final stringValue = jsonEncode(value);
           await _secureStorage.write(key: keyWithPrefix, value: stringValue);
         } catch (e) {
-          throw Errors.getInternalError(
-            Errors.MISSING_OR_INVALID,
-            context: e.toString(),
-          );
+          await _switchToFallbackStorage(e);
         }
       }
     }
@@ -144,7 +152,12 @@ class SecureStore implements IStore<Map<String, dynamic>> {
     if (_useFallbackStorage) {
       await _fallbackStorage.delete(key);
     } else {
-      await _secureStorage.delete(key: keyWithPrefix);
+      try {
+        await _secureStorage.delete(key: keyWithPrefix);
+      } catch (e) {
+        await _switchToFallbackStorage(e);
+        await _fallbackStorage.delete(key);
+      }
     }
   }
 
@@ -155,12 +168,17 @@ class SecureStore implements IStore<Map<String, dynamic>> {
     if (_useFallbackStorage) {
       await _fallbackStorage.deleteAll();
     } else {
-      // Get all keys from secure storage and delete them
-      final allKeys = await _secureStorage.readAll();
-      for (final key in allKeys.keys) {
-        if (key.startsWith(storagePrefix)) {
-          await _secureStorage.delete(key: key);
+      try {
+        // Get all keys from secure storage and delete them
+        final allKeys = await _secureStorage.readAll();
+        for (final key in allKeys.keys) {
+          if (key.startsWith(storagePrefix)) {
+            await _secureStorage.delete(key: key);
+          }
         }
+      } catch (e) {
+        await _switchToFallbackStorage(e);
+        await _fallbackStorage.deleteAll();
       }
     }
 
@@ -198,15 +216,13 @@ class SecureStore implements IStore<Map<String, dynamic>> {
 
   Future<void> _restoreFromFallback() async {
     try {
-      // Get all keys from fallback storage
-      final allKeys = _fallbackStorage.getAll();
+      for (final key in _fallbackStorage.keys) {
+        if (!key.startsWith(storagePrefix)) {
+          continue;
+        }
 
-      // Restore data to memory map
-      for (final entry in allKeys) {
-        final key = entry.keys.first;
-        final value = entry.values.first;
-
-        if (key.startsWith(storagePrefix)) {
+        final value = _fallbackStorage.get(_removePrefix(key));
+        if (value != null) {
           _map[key] = value;
         }
       }
@@ -215,8 +231,33 @@ class SecureStore implements IStore<Map<String, dynamic>> {
     }
   }
 
+  Future<void> _switchToFallbackStorage(Object error) async {
+    if (_useFallbackStorage) {
+      return;
+    }
+
+    debugPrint(
+      'Warning: Secure storage failed, using fallback storage: $error',
+    );
+    _useFallbackStorage = true;
+
+    for (final entry in _map.entries) {
+      await _setFallbackValue(_removePrefix(entry.key), entry.value);
+    }
+  }
+
+  Future<void> _setFallbackValue(String key, Map<String, dynamic> value) async {
+    await _fallbackStorage.set(key, value);
+  }
+
   String _addPrefix(String key) {
     return '$storagePrefix$key';
+  }
+
+  String _removePrefix(String key) {
+    return key.startsWith(storagePrefix)
+        ? key.substring(storagePrefix.length)
+        : key;
   }
 
   void _checkInitialized() {

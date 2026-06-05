@@ -109,12 +109,12 @@ class NoMService extends IChain {
 
   SessionData _sessionByTopic(String topic) {
     return wallet!.getActiveSessions().values.firstWhere(
-      (element) => element.topic == topic,
-      orElse: () => throw const ReownCoreError(
-        code: 5001,
-        message: 'WalletConnect session not found',
-      ),
-    );
+          (element) => element.topic == topic,
+          orElse: () => throw const ReownCoreError(
+            code: 5001,
+            message: 'WalletConnect session not found',
+          ),
+        );
   }
 
   String _resolveActiveAddress() {
@@ -199,11 +199,10 @@ class NoMService extends IChain {
 
   dynamic _canonicalJsonValue(dynamic value) {
     if (value is Map) {
-      final entries =
-          value.entries
-              .map((entry) => MapEntry(entry.key.toString(), entry.value))
-              .toList()
-            ..sort((left, right) => left.key.compareTo(right.key));
+      final entries = value.entries
+          .map((entry) => MapEntry(entry.key.toString(), entry.value))
+          .toList()
+        ..sort((left, right) => left.key.compareTo(right.key));
       return <String, dynamic>{
         for (final entry in entries)
           entry.key: _canonicalJsonValue(entry.value),
@@ -237,6 +236,10 @@ class NoMService extends IChain {
     }
     final session = _sessionByTopic(topic);
     final dAppMetadata = session.peer.metadata;
+    final dAppName = _dAppName(dAppMetadata);
+    final dAppDescription = _dAppDescription(dAppMetadata);
+    final dAppUrl = _dAppUrl(dAppMetadata);
+    final dAppIconUrl = _dAppIconUrl(dAppMetadata);
 
     final activeAddress = _resolveActiveAddress();
     _logger.info(
@@ -248,31 +251,35 @@ class NoMService extends IChain {
         final actionWasAccepted = await showDialogWithNoAndYesOptions(
           context: globalNavigatorKey.currentContext!,
           isBarrierDismissible: false,
-          title: '${dAppMetadata.name} - Information',
+          title: '$dAppName - Information',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                'Are you sure you want to allow ${dAppMetadata.name} to '
+                'Are you sure you want to allow $dAppName to '
                 'retrieve the current address, node URL and chain identifier information?',
               ),
               kVerticalSpacing,
-              Image(
-                image: NetworkImage(dAppMetadata.icons.first),
-                height: 100.0,
-                fit: BoxFit.fitHeight,
-              ),
+              if (dAppIconUrl != null)
+                Image(
+                  image: NetworkImage(dAppIconUrl),
+                  height: 100.0,
+                  fit: BoxFit.fitHeight,
+                ),
               kVerticalSpacing,
-              Text(dAppMetadata.description),
+              Text(dAppDescription),
               kVerticalSpacing,
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(dAppMetadata.url),
-                  LinkIcon(url: dAppMetadata.url),
-                ],
-              ),
+              if (dAppUrl != null)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(dAppUrl, overflow: TextOverflow.ellipsis),
+                    ),
+                    LinkIcon(url: dAppUrl),
+                  ],
+                ),
             ],
           ),
           onYesButtonPressed: () async {},
@@ -306,6 +313,10 @@ class NoMService extends IChain {
     }
     final session = _sessionByTopic(topic);
     final dAppMetadata = session.peer.metadata;
+    final dAppName = _dAppName(dAppMetadata);
+    final dAppDescription = _dAppDescription(dAppMetadata);
+    final dAppUrl = _dAppUrl(dAppMetadata);
+    final dAppIconUrl = _dAppIconUrl(dAppMetadata);
     final activeAddress = _resolveActiveAddress();
     final requestedFromAddress = _extractRequestedFromAddress(params);
     final signerAddress = _resolveSignerAddress(
@@ -328,7 +339,7 @@ class NoMService extends IChain {
         final actionWasAccepted = await showDialogWithNoAndYesOptions(
           context: globalNavigatorKey.currentContext!,
           isBarrierDismissible: false,
-          title: '${dAppMetadata.name} - Sign Message',
+          title: '$dAppName - Sign Message',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -340,21 +351,25 @@ class NoMService extends IChain {
               kVerticalSpacing,
               Text('Signing address: $signerAddress'),
               kVerticalSpacing,
-              Image(
-                image: NetworkImage(dAppMetadata.icons.first),
-                height: 100.0,
-                fit: BoxFit.fitHeight,
-              ),
+              if (dAppIconUrl != null)
+                Image(
+                  image: NetworkImage(dAppIconUrl),
+                  height: 100.0,
+                  fit: BoxFit.fitHeight,
+                ),
               kVerticalSpacing,
-              Text(dAppMetadata.description),
+              Text(dAppDescription),
               kVerticalSpacing,
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(dAppMetadata.url),
-                  LinkIcon(url: dAppMetadata.url),
-                ],
-              ),
+              if (dAppUrl != null)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(dAppUrl, overflow: TextOverflow.ellipsis),
+                    ),
+                    LinkIcon(url: dAppUrl),
+                  ],
+                ),
             ],
           ),
           onYesButtonPressed: () async {},
@@ -384,6 +399,10 @@ class NoMService extends IChain {
     }
     final session = _sessionByTopic(topic);
     final dAppMetadata = session.peer.metadata;
+    final dAppName = _dAppName(dAppMetadata);
+    final dAppDescription = _dAppDescription(dAppMetadata);
+    final dAppUrl = _dAppUrl(dAppMetadata);
+    final dAppIconUrl = _dAppIconUrl(dAppMetadata);
     final activeAddress = _resolveActiveAddress();
     final requestedFromAddress = _extractRequestedFromAddress(params);
     final signerAddress = _resolveSignerAddress(
@@ -420,7 +439,7 @@ class NoMService extends IChain {
         final wasActionAccepted = await showDialogWithNoAndYesOptions(
           context: globalNavigatorKey.currentContext!,
           isBarrierDismissible: false,
-          title: '${dAppMetadata.name} - Send Payment',
+          title: '$dAppName - Send Payment',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -433,25 +452,28 @@ class NoMService extends IChain {
               kVerticalSpacing,
               Text('Source address: $signerAddress'),
               kVerticalSpacing,
-              Image(
-                image: NetworkImage(dAppMetadata.icons.first),
-                height: 100.0,
-                fit: BoxFit.fitHeight,
-              ),
+              if (dAppIconUrl != null)
+                Image(
+                  image: NetworkImage(dAppIconUrl),
+                  height: 100.0,
+                  fit: BoxFit.fitHeight,
+                ),
               kVerticalSpacing,
-              Text(dAppMetadata.description),
+              Text(dAppDescription),
               kVerticalSpacing,
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(dAppMetadata.url),
-                  LinkIcon(url: dAppMetadata.url),
-                ],
-              ),
+              if (dAppUrl != null)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(dAppUrl, overflow: TextOverflow.ellipsis),
+                    ),
+                    LinkIcon(url: dAppUrl),
+                  ],
+                ),
             ],
           ),
-          description:
-              'Are you sure you want to transfer '
+          description: 'Are you sure you want to transfer '
               '$amount ${token.symbol} to '
               '$toAddress from $signerAddress ?',
           onYesButtonPressed: () {},
@@ -482,5 +504,41 @@ class NoMService extends IChain {
     } else {
       throw _walletLockedError;
     }
+  }
+
+  String _dAppName(PairingMetadata metadata) {
+    return _metadataValue(metadata.name, 'Unknown dApp');
+  }
+
+  String _dAppDescription(PairingMetadata metadata) {
+    return _metadataValue(metadata.description, 'No description provided');
+  }
+
+  String? _dAppUrl(PairingMetadata metadata) {
+    final value = _metadataValue(metadata.url, '');
+    final uri = Uri.tryParse(value);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return null;
+    }
+    return value;
+  }
+
+  String? _dAppIconUrl(PairingMetadata metadata) {
+    for (final icon in metadata.icons) {
+      final value = _metadataValue(icon, '');
+      final uri = Uri.tryParse(value);
+      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  String _metadataValue(String value, String fallback) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') {
+      return fallback;
+    }
+    return trimmed;
   }
 }
