@@ -31,6 +31,8 @@ class Web3WalletService extends IWeb3WalletService {
   final Logger _logger = Logger('WalletConnectService');
 
   ReownWalletKit? _wcClient;
+  Future<void>? _initFuture;
+  bool _isInitialized = false;
   Timer? _pendingRequestsPollTimer;
   final Set<int> _approvedProposalIds = <int>{};
   final Set<int> _proposalIdsInFlight = <int>{};
@@ -98,9 +100,30 @@ class Web3WalletService extends IWeb3WalletService {
       return;
     }
 
-    _registerAccountsIfNeeded();
+    if (_isInitialized) {
+      return;
+    }
 
+    final pendingInit = _initFuture;
+    if (pendingInit != null) {
+      return pendingInit;
+    }
+
+    _initFuture = _initialize();
+    try {
+      await _initFuture;
+    } finally {
+      if (!_isInitialized) {
+        _initFuture = null;
+      }
+    }
+  }
+
+  Future<void> _initialize() async {
     await _wcClient!.init();
+
+    _isInitialized = true;
+    _registerAccountsIfNeeded();
 
     _reloadStores();
     _refreshUi();
@@ -119,6 +142,8 @@ class Web3WalletService extends IWeb3WalletService {
     _inFlightRequestIds.clear();
     _completedRequestIds.clear();
     _stalePendingTopics.clear();
+    _initFuture = null;
+    _isInitialized = false;
     _wcClient = null;
 
     _registeredAccounts.clear();
@@ -129,9 +154,14 @@ class Web3WalletService extends IWeb3WalletService {
 
   @override
   Future<PairingInfo> pair(Uri uri) async {
-    await _cleanupStalePairings();
     if (_wcClient == null) {
       throw StateError('WalletConnect client not created');
+    }
+
+    await init();
+
+    if (!_isInitialized) {
+      throw StateError('WalletConnect client not initialized');
     }
 
     if (kAddressLabelMap.isEmpty) {
@@ -396,8 +426,8 @@ class Web3WalletService extends IWeb3WalletService {
 
     try {
       final session = _wcClient!.getActiveSessions().values.firstWhere(
-        (element) => element.topic == topic,
-      );
+            (element) => element.topic == topic,
+          );
 
       final chains = session.namespaces['zenon']?.chains;
       if (chains != null && chains.isNotEmpty) {
@@ -946,14 +976,14 @@ class Web3WalletService extends IWeb3WalletService {
     PairingMetadata dAppMetadata,
   ) {
     return sl.get<NotificationsBloc>().addNotification(
-      WalletNotification(
-        title: 'Successfully connected to ${dAppMetadata.name}',
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-        details:
-            'Successfully connected to ${dAppMetadata.name} via WalletConnect',
-        type: NotificationType.paymentSent,
-      ),
-    );
+          WalletNotification(
+            title: 'Successfully connected to ${dAppMetadata.name}',
+            timestamp: DateTime.now().millisecondsSinceEpoch,
+            details:
+                'Successfully connected to ${dAppMetadata.name} via WalletConnect',
+            type: NotificationType.paymentSent,
+          ),
+        );
   }
 
   Future<ApproveResponse> _approveSession({required int id}) async {
