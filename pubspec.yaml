@@ -80,6 +80,12 @@ dependency_overrides:
   # in this PR. Remove when upstream reown_core contains the same fix.
   reown_core:
     path: patched_packages/reown_core-1.3.8
+  # Temporary override so registered session request handlers receive the
+  # JSON-RPC request id and their result is sent back to the dApp directly,
+  # instead of relying on a pending-request poller. Remove when upstream
+  # reown_sign responds with the handler result itself.
+  reown_sign:
+    path: patched_packages/reown_sign-1.3.9
   # Temporary override to skip WalletConnect Pay plugin initialization on
   # desktop, where walletconnect_pay has no macOS implementation.
   reown_walletkit:
@@ -92,6 +98,10 @@ dev_dependencies:
   hive_generator: ^2.0.0
   flutter_lints: ^6.0.0
   dependency_validator: ^4.1.1
+  # Imported directly by tests covering the patched_packages overrides.
+  flutter_secure_storage: ^9.2.4
+  reown_core: ^1.3.8
+  reown_sign: ^1.3.9
 
 flutter:
   uses-material-design: true

@@ -7,6 +7,11 @@ import 'package:reown_core/utils/constants.dart';
 import 'package:reown_core/utils/errors.dart';
 
 class SecureStore implements IStore<Map<String, dynamic>> {
+  /// Marker persisted in the fallback storage once secure storage has failed,
+  /// so the fallback keeps being used on subsequent launches even when secure
+  /// reads succeed again (e.g. macOS keychain reads work but writes fail).
+  static const String _fallbackFlagKey = 'secure_store_fallback_mode';
+
   late final FlutterSecureStorage _secureStorage;
   late final IStore<Map<String, dynamic>> _fallbackStorage;
   bool _initialized = false;
@@ -29,8 +34,12 @@ class SecureStore implements IStore<Map<String, dynamic>> {
   SecureStore({
     Map<String, Map<String, dynamic>>? defaultValue,
     required IStore<Map<String, dynamic>> fallbackStorage,
+    FlutterSecureStorage? secureStorage,
   }) : _map = defaultValue ?? {},
-       _fallbackStorage = fallbackStorage;
+       _fallbackStorage = fallbackStorage,
+       _injectedSecureStorage = secureStorage;
+
+  final FlutterSecureStorage? _injectedSecureStorage;
 
   @override
   Future<void> init() async {
@@ -40,17 +49,27 @@ class SecureStore implements IStore<Map<String, dynamic>> {
 
     try {
       // Try secure storage first
-      _secureStorage = const FlutterSecureStorage(
-        aOptions: AndroidOptions(encryptedSharedPreferences: true),
-        iOptions: IOSOptions(
-          accessibility: KeychainAccessibility.first_unlock_this_device,
-        ),
-      );
+      _secureStorage = _injectedSecureStorage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.first_unlock_this_device,
+            ),
+          );
 
-      await restore();
+      if (_fallbackStorage.has(_fallbackFlagKey)) {
+        // A previous launch already switched to the fallback storage; keep
+        // using it instead of treating possibly stale secure data as
+        // authoritative.
+        _useFallbackStorage = true;
+        await _restoreFromFallback();
+      } else {
+        await restore();
+      }
     } catch (e) {
       // Fall back to regular storage if secure storage fails
       _useFallbackStorage = true;
+      await _persistFallbackFlag();
       // Try to restore from fallback storage
       await _restoreFromFallback();
     }
@@ -220,6 +239,9 @@ class SecureStore implements IStore<Map<String, dynamic>> {
         if (!key.startsWith(storagePrefix)) {
           continue;
         }
+        if (key == _addPrefix(_fallbackFlagKey)) {
+          continue;
+        }
 
         final value = _fallbackStorage.get(_removePrefix(key));
         if (value != null) {
@@ -240,6 +262,7 @@ class SecureStore implements IStore<Map<String, dynamic>> {
       'Warning: Secure storage failed, using fallback storage: $error',
     );
     _useFallbackStorage = true;
+    await _persistFallbackFlag();
 
     for (final entry in _map.entries) {
       await _setFallbackValue(_removePrefix(entry.key), entry.value);
@@ -248,6 +271,16 @@ class SecureStore implements IStore<Map<String, dynamic>> {
 
   Future<void> _setFallbackValue(String key, Map<String, dynamic> value) async {
     await _fallbackStorage.set(key, value);
+  }
+
+  Future<void> _persistFallbackFlag() async {
+    try {
+      await _fallbackStorage.set(_fallbackFlagKey, {'enabled': true});
+    } catch (e) {
+      debugPrint(
+        'Warning: Failed to persist secure storage fallback flag: $e',
+      );
+    }
   }
 
   String _addPrefix(String key) {

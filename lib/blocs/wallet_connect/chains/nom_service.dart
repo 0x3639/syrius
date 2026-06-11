@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:reown_walletkit/reown_walletkit.dart';
@@ -14,6 +12,7 @@ import 'package:zenon_syrius_wallet_flutter/utils/extensions.dart';
 import 'package:zenon_syrius_wallet_flutter/utils/functions.dart';
 import 'package:zenon_syrius_wallet_flutter/utils/global.dart';
 import 'package:zenon_syrius_wallet_flutter/utils/notification_utils.dart';
+import 'package:zenon_syrius_wallet_flutter/utils/wallet_connect_request_utils.dart';
 import 'package:zenon_syrius_wallet_flutter/widgets/main_app_container.dart';
 import 'package:zenon_syrius_wallet_flutter/widgets/reusable_widgets/dialogs.dart';
 import 'package:zenon_syrius_wallet_flutter/widgets/reusable_widgets/icons/link_icon.dart';
@@ -74,8 +73,19 @@ class NoMService extends IChain {
     return ['chainIdChange', 'addressChange'];
   }
 
-  Future<dynamic> handleZnnInfo(String topic, dynamic params) {
-    final key = 'znn_info:$topic';
+  Future<dynamic> handleZnnInfo(
+    String topic,
+    dynamic params, {
+    int? requestId,
+  }) {
+    // znn_info approval does not depend on params, so without a request id
+    // the key stays topic-scoped like before.
+    final key = interactiveRequestKey(
+      method: 'znn_info',
+      topic: topic,
+      params: null,
+      requestId: requestId,
+    );
     return _runSingleFlight(key, () => _methodZnnInfo(topic, params));
   }
 
@@ -84,7 +94,7 @@ class NoMService extends IChain {
     dynamic params, {
     int? requestId,
   }) {
-    final key = _interactiveRequestKey(
+    final key = interactiveRequestKey(
       method: 'znn_sign',
       topic: topic,
       params: params,
@@ -98,7 +108,7 @@ class NoMService extends IChain {
     dynamic params, {
     int? requestId,
   }) {
-    final key = _interactiveRequestKey(
+    final key = interactiveRequestKey(
       method: 'znn_send',
       topic: topic,
       params: params,
@@ -174,44 +184,6 @@ class NoMService extends IChain {
   bool _isWalletOwnedAddress(String address) {
     return kAddressLabelMap.containsKey(address) ||
         kDefaultAddressList.contains(address);
-  }
-
-  String _interactiveRequestKey({
-    required String method,
-    required String topic,
-    required dynamic params,
-    required int? requestId,
-  }) {
-    final paramsFingerprint = _requestParamsFingerprint(params);
-    if (paramsFingerprint.isNotEmpty) {
-      return '$method:$topic:$paramsFingerprint';
-    }
-    return '$method:$topic:${requestId ?? ''}';
-  }
-
-  String _requestParamsFingerprint(dynamic params) {
-    try {
-      return jsonEncode(_canonicalJsonValue(params));
-    } catch (_) {
-      return params.toString();
-    }
-  }
-
-  dynamic _canonicalJsonValue(dynamic value) {
-    if (value is Map) {
-      final entries = value.entries
-          .map((entry) => MapEntry(entry.key.toString(), entry.value))
-          .toList()
-        ..sort((left, right) => left.key.compareTo(right.key));
-      return <String, dynamic>{
-        for (final entry in entries)
-          entry.key: _canonicalJsonValue(entry.value),
-      };
-    }
-    if (value is Iterable) {
-      return value.map(_canonicalJsonValue).toList();
-    }
-    return value;
   }
 
   Future<dynamic> _runSingleFlight(

@@ -444,10 +444,14 @@ class Web3WalletService extends IWeb3WalletService {
     String topic,
     dynamic params, {
     String? chainId,
+    int? requestId,
   }) {
     final chain = _resolveChainService(topic, chainId: chainId);
     if (chain is NoMService) {
-      return chain.handleZnnInfo(topic, params);
+      return _trackRequestLifecycle(
+        requestId,
+        () => chain.handleZnnInfo(topic, params, requestId: requestId),
+      );
     }
     throw UnsupportedError(
       'znn_info not implemented for chain ${chain.getChainId()}',
@@ -462,7 +466,10 @@ class Web3WalletService extends IWeb3WalletService {
   }) {
     final chain = _resolveChainService(topic, chainId: chainId);
     if (chain is NoMService) {
-      return chain.handleZnnSign(topic, params, requestId: requestId);
+      return _trackRequestLifecycle(
+        requestId,
+        () => chain.handleZnnSign(topic, params, requestId: requestId),
+      );
     }
     throw UnsupportedError(
       'znn_sign not implemented for chain ${chain.getChainId()}',
@@ -477,11 +484,34 @@ class Web3WalletService extends IWeb3WalletService {
   }) {
     final chain = _resolveChainService(topic, chainId: chainId);
     if (chain is NoMService) {
-      return chain.handleZnnSend(topic, params, requestId: requestId);
+      return _trackRequestLifecycle(
+        requestId,
+        () => chain.handleZnnSend(topic, params, requestId: requestId),
+      );
     }
     throw UnsupportedError(
       'znn_send not implemented for chain ${chain.getChainId()}',
     );
+  }
+
+  /// Marks [requestId] in flight while [action] runs and completed once it
+  /// settles, so the pending-request poller never re-dispatches a request
+  /// the live handler path already handled. A request that failed is also
+  /// completed: its error response is on the way and re-prompting the user
+  /// for it would be wrong.
+  Future<dynamic> _trackRequestLifecycle(
+    int? requestId,
+    Future<dynamic> Function() action,
+  ) async {
+    if (requestId == null) {
+      return action();
+    }
+    _markRequestInFlight(requestId);
+    try {
+      return await action();
+    } finally {
+      _markRequestCompleted(requestId);
+    }
   }
 
   void _startPendingRequestsPolling() {
@@ -610,7 +640,12 @@ class Web3WalletService extends IWeb3WalletService {
   }) {
     switch (method) {
       case 'znn_info':
-        return _handleZnnInfoRequest(topic, params, chainId: chainId);
+        return _handleZnnInfoRequest(
+          topic,
+          params,
+          chainId: chainId,
+          requestId: requestId,
+        );
       case 'znn_sign':
         return _handleZnnSignRequest(
           topic,
@@ -677,7 +712,10 @@ class Web3WalletService extends IWeb3WalletService {
         message.contains('response already') ||
         message.contains('request already') ||
         message.contains('duplicate response') ||
-        message.contains('request not found');
+        message.contains('request not found') ||
+        // Thrown by reown_sign's _isValidPendingRequest once the pending
+        // request has been deleted after a direct handler response.
+        message.contains("proposal id doesn't exist");
   }
 
   T? _tryGet<T>(T Function() fn) {
