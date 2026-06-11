@@ -840,8 +840,6 @@ class Web3WalletService extends IWeb3WalletService {
     );
 
     if (accepted == true) {
-      _approvedProposalIds.add(event.id);
-
       try {
         final approveResponse = await _approveSession(id: event.id);
 
@@ -849,6 +847,9 @@ class Web3WalletService extends IWeb3WalletService {
           throw StateError('WalletConnect approveSession returned null');
         }
 
+        // Mark the proposal as approved only after approveSession succeeds,
+        // so a transient failure leaves the id free for a retried delivery.
+        _approvedProposalIds.add(event.id);
         _upsertSession(approveResponse.session!);
         await _sendSuccessfullyApprovedSessionNotification(dAppMetadata);
 
