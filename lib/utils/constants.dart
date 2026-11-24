@@ -28,7 +28,7 @@ const SizedBox kSpacingBetweenActionButtons = SizedBox(
 const Size kAcceleratorProgressBarSize = Size(300.0, 10.0);
 
 // Wallet version
-const String kWalletVersion = '0.2.5';
+const String kWalletVersion = '0.2.6';
 
 // Boxes constants
 const String kFavoriteTokensBox = 'favourite_tokens_box';

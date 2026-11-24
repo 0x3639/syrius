@@ -120,6 +120,7 @@ class Web3WalletService extends IWeb3WalletService {
   Future<void> _initialize() async {
     _registerEventEmitters();
     _registerRequestHandlers();
+    _registerAccountsIfNeeded();
 
     await _wcClient!.init();
 

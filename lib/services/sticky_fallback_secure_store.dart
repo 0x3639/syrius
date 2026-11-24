@@ -303,7 +303,9 @@ class StickyFallbackSecureStore implements IStore<Map<String, dynamic>> {
     _useFallbackStorage = true;
     await _persistFallbackFlag();
 
-    for (final MapEntry<String, Map<String, dynamic>> entry in _map.entries) {
+    final List<MapEntry<String, Map<String, dynamic>>> snapshot =
+        List<MapEntry<String, Map<String, dynamic>>>.from(_map.entries);
+    for (final MapEntry<String, Map<String, dynamic>> entry in snapshot) {
       await _fallbackStorage.set(_removePrefix(entry.key), entry.value);
     }
   }
