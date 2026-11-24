@@ -1,5 +1,23 @@
 import 'dart:convert';
 
+import 'package:reown_walletkit/reown_walletkit.dart';
+
+/// Converts a WalletConnect request handler error into a [JsonRpcError],
+/// preserving SDK/core error codes when available instead of collapsing all
+/// failures into a generic error code.
+JsonRpcError walletConnectErrorToJsonRpcError(Object error) {
+  if (error is JsonRpcError) {
+    return error;
+  }
+  if (error is ReownSignError) {
+    return JsonRpcError(code: error.code, message: error.message);
+  }
+  if (error is ReownCoreError) {
+    return JsonRpcError(code: error.code, message: error.message);
+  }
+  return JsonRpcError(code: 5000, message: error.toString());
+}
+
 /// Builds the single-flight key for an interactive WalletConnect request.
 ///
 /// The JSON-RPC [requestId] is the canonical identity of a request: two
